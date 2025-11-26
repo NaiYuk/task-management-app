@@ -4,17 +4,15 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Task } from '@/types/task'
-import {LogOut,  LucideStopCircle, LucideActivity, LucideLoader, LucideCheck } from 'lucide-react'
+import {LogOut,  LucideStopCircle, LucideActivity, LucideLoader, LucideCheck, LucideHome, LucideAccessibility, LucidePackage } from 'lucide-react'
 import { TaskList } from '@/components/TaskList'
 
 export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [page, setPage] = useState(1)
-  const [filters, setFilters] = useState({ search: '', status: '', priority: '' })
-  const [clearSignal, setClearSignal] = useState(false)
-  const [filteredTasks, setFilteredTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [userEmail, setUserEmail] = useState<string>('')
+  const [taskStats, setTaskStats] = useState({ total: 0, todo: 0, in_progress: 0, done: 0 })
   const router = useRouter()
   const supabase = createClient()
 
@@ -50,9 +48,7 @@ export default function DashboardPage() {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-
       setTasks(data || [])
-      setFilteredTasks(data || [])
     } catch (error) {
       console.error('タスク読み込みエラー:', error)
     } finally {
@@ -66,23 +62,14 @@ export default function DashboardPage() {
     router.push('/login')
   }
 
-
-  // タスク統計情報の計算
-  const taskStats = {
-    total: tasks.length,
-    todo: tasks.filter((task) => task.status === 'todo').length,
-    in_progress: tasks.filter((task) => task.status === 'in_progress').length,
-    done: tasks.filter((task) => task.status === 'done').length,
-  }
-
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-200 to-black-800">
       {/* ヘッダー */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex items-center gap-3">
+              <LucidePackage className='h-8 w-8 text-green-900 inline-block mb-1'/>
               <p className="text-2xl font-bold text-green-900">タスク管理アプリ　たすくん。</p>
             </div>
             <div className="flex items-center gap-4">
@@ -132,16 +119,13 @@ export default function DashboardPage() {
             <div className="text-3xl font-bold text-gray-600">{taskStats.done}</div>
           </div>
         </div>
-          <TaskList 
-            page={page}
-            userEmail={userEmail}
-            onChangePage={(newPage: number) => setPage(newPage)}
-            filter={filters}
-            onClearFilter={() => {
-              setFilters({ search: '', status: '', priority: '' })
-              setClearSignal(true)
-            }}
-          />
+        <TaskList 
+          page={page}
+          userEmail={userEmail}
+          onTasksChange={setTasks}
+          onStatsChange={setTaskStats}
+          onChangePage={(newPage: number) => setPage(newPage)}
+        />
       </main>
     </div>
   )
