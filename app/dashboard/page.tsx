@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Task } from '@/types/task'
-import {LogOut,  LucideStopCircle, LucideActivity, LucideLoader, LucideCheck, LucideHome, LucideAccessibility, LucidePackage } from 'lucide-react'
+import {LogOut, LucideActivity, LucideLoader, LucideCheck, LucideHome, LucideAccessibility, LucidePackage, LucideRectangleVertical, LucidePause, LucidePauseCircle } from 'lucide-react'
 import { TaskList } from '@/components/TaskList'
 
 export default function DashboardPage() {
@@ -115,7 +115,7 @@ export default function DashboardPage() {
           </div>
           <div className="bg-gray-100 bg-opacity-50 rounded-xl shadow-sm p-5 border border-gray-200">
             <div className="text-sm text-gray-600 mb-1">
-              <LucideStopCircle className='h-5 w-5 mb-2 text-gray-600'/>
+              <LucidePauseCircle className='h-5 w-5 mb-2 text-gray-600'/>
               未対応
             </div>
             <div className="text-3xl font-bold text-gray-600">{taskStats.todo}</div>
