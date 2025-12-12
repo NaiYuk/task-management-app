@@ -2,7 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// タスク作成API
+/**
+ * タスク作成処理
+ * @param request 
+ * @returns 
+ */
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient()
@@ -61,7 +65,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// タスク一覧取得API（検索・フィルタリング対応）
+/**
+ * タスク一覧取得（検索・フィルタリング対応）
+ * @param request 
+ * @returns 
+ */
 export async function GET(request: NextRequest) {
   try {
     const supabase = createClient()
@@ -106,22 +114,15 @@ export async function GET(request: NextRequest) {
 
       return query
     }
-
-    // ページング対応（オフセットとリミット(9)）
-    const page = Number(searchParams.get('page') || 1)
-    const limit = 9;
-    const offset = (page - 1) * limit
-
+    
     const { data: tasks, error, count } = await createFilteredQuery()
       .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1)
     
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
     const total = count || 0
-    const totalPages = total === 0 ? 0 : Math.ceil(total / limit)
     const [todoResult, inProgressResult, doneResult] = await Promise.all([
       createFilteredQuery('todo', true),
       createFilteredQuery('in_progress', true),
@@ -135,12 +136,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       tasks,
-      pagination: ({
-        page,
-        perPage: limit,
-        total,
-        totalPages,
-      }),
       statusCounts: {
         total,
         todo: todoResult.count ?? 0,

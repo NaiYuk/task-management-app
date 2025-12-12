@@ -19,6 +19,7 @@ export default function SearchBar({ onSearch, onClearFilter }: SearchBarProps) {
   const [priority, setPriority] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
+  // フィルター変更時に検索を実行
   useEffect(() => {
     const debounce = setTimeout(() => {
       onSearch({ search, status, priority })

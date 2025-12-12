@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+/**
+ * Slack通知処理
+ * @param request 
+ * @returns 
+ */
 export async function POST(request: NextRequest) {
   try {
     const webhookUrl = process.env.SLACK_WEBHOOK_URL
