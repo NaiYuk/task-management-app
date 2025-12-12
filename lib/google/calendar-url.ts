@@ -1,3 +1,4 @@
+// Googleカレンダーのイベント作成URLを生成するユーティリティ関数
 export function generateGoogleCalendarUrl({
   title,
   description,

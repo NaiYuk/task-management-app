@@ -1,7 +1,7 @@
 'use client'
 
 import { Task } from '@/types/task'
-import { Edit2, Trash2, Calendar, Flag, LucideStopCircle, LucideLoader, LucideCheck, Edit, LucideBell, LucideCalendar } from 'lucide-react'
+import { Edit2, Trash2, Calendar, Flag, LucidePauseCircle, LucideLoader, LucideCheck, Edit, LucideBell, LucideCalendar } from 'lucide-react'
 
 interface TaskCardProps {
   task: Task
@@ -18,13 +18,13 @@ const statusColors = {
 }
 
 const statusLabels = {
-  todo: '未着手',
-  in_progress: '進行中',
+  todo: '未対応',
+  in_progress: '対応中',
   done: '完了',
 }
 
 const statusIcons = {
-  todo: <LucideStopCircle className='h-4 w-4'/>,
+  todo: <LucidePauseCircle className='h-4 w-4'/>,
   in_progress: <LucideLoader className='h-4 w-4'/>,
   done: <LucideCheck className='h-4 w-4'/>,
 }

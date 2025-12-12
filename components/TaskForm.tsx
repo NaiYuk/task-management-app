@@ -23,6 +23,7 @@ export default function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
   const [isSpeechSupported, setIsSpeechSupported] = useState(false)
   const recognitionRef = useRef<any>(null)
 
+  // 音声認識のサポート確認
   useEffect(() => {
     const isSupported = typeof window !== 'undefined' &&
       ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
@@ -34,6 +35,11 @@ export default function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
     }
   }, [])
 
+  /** 
+   * フォーム送信処理
+   * @param e {React.FormEvent}
+   * @return {void}
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -47,6 +53,11 @@ export default function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
     }
   }
 
+  /** 
+   * 音声入力の開始・停止切り替え
+   * @param field 'title' | 'description'
+   * @return {void}
+   */
   const handleSpeechToggle = (field: 'title' | 'description') => {
     if (!isSpeechSupported) return
 
@@ -58,6 +69,7 @@ export default function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
 
     recognitionRef.current?.stop()
 
+    // 音声認識の初期化
     const SpeechRecognition =
       typeof window !== 'undefined'
         ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
@@ -71,6 +83,7 @@ export default function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
     recognition.interimResults = false
     recognition.continuous = false
 
+    // 音声認識結果の処理
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript
       setFormData((prev) => ({
@@ -78,15 +91,15 @@ export default function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
         [field]: `${prev[field]}${prev[field] ? ' ' : ''}${transcript}`,
       }))
     }
-
+    // エラー処理
     recognition.onerror = () => {
       setListeningField(null)
     }
-
+    // 終了処理
     recognition.onend = () => {
       setListeningField(null)
     }
-
+    // 音声認識開始
     recognition.start()
     setListeningField(field)
   }
@@ -173,8 +186,8 @@ export default function TaskForm({ task, onSubmit, onClose }: TaskFormProps) {
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as TaskStatus })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900"
               >
-                <option value="todo">未着手</option>
-                <option value="in_progress">進行中</option>
+                <option value="todo">未対応</option>
+                <option value="in_progress">対応中</option>
                 <option value="done">完了</option>
               </select>
             </div>

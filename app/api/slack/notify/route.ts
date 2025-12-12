@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+/**
+ * Slack通知処理
+ * @param request 
+ * @returns 
+ */
 export async function POST(request: NextRequest) {
   try {
     const webhookUrl = process.env.SLACK_WEBHOOK_URL
@@ -26,8 +31,8 @@ export async function POST(request: NextRequest) {
     }
 
     const statusText = {
-      todo: '未着手',
-      in_progress: '進行中',
+      todo: '未対応',
+      in_progress: '対応中',
       done: '完了',
     }
 

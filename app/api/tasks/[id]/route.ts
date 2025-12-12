@@ -2,7 +2,12 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// タスク更新API
+/**
+ * タスク更新処理
+ * @param request 
+ * @param params { id: string }
+ * @returns 
+ */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -47,7 +52,12 @@ export async function PATCH(
   }
 }
 
-// タスク削除API
+/**
+ * タスク更新処理
+ * @param request 
+ * @param param1 
+ * @returns 
+ */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
