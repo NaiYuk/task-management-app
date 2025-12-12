@@ -1,51 +1,67 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { ChangeEvent, useCallback, useEffect, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Task, TaskFormData } from '@/types/task';
 import { generateGoogleCalendarUrl } from "@/lib/google/calendar-url";
 import { Loader2, LucideSortAsc, LucideSortDesc, Plus } from "lucide-react";
 import SearchBar from "./SearchBar";
-import Pagination from "./Pagination";
 import TaskForm from "./TaskForm";
 import TaskCard from "./TaskCard";
 
-type PaginationState = { page: number; perPage: number; total: number; totalPages: number }
 type SortItem = 'title' | 'priority' | 'due_date' | 'created_at'
 export function TaskList({
-  page = 1,
   userEmail,
-  onChangePage,
   onStatsChange,
   onTasksChange,
 }: {
-  page?: number
   userEmail: string
-  onChangePage: (page: number) => void
   onTasksChange?: (tasks: Task[]) => void
   onStatsChange?: (stats: { total: number; todo: number; in_progress: number; done: number }) => void
 }) {
     const [tasks, setTasks] = useState<Task[]>([])
     const [showForm, setShowForm] = useState(false)
     const [editingTask, setEditingTask] = useState<Task | undefined>(undefined)
-    const [pagination, setPagination] = useState<PaginationState | null>(null)
     const [loading, setLoading] = useState(false)
     const [sortItem, setSortItem] = useState<SortItem>('created_at')
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
     const [filters, setFilters] = useState({ search: '', status: '', priority: '' })
+    const columnRefs = useRef<Record<string, HTMLDivElement | null>>({})
+    const [activeVerticalSlides, setActiveVerticalSlides] = useState<Record<string, number>>({
+      todo: 0,
+      in_progress: 0,
+      done: 0,
+    })
     const supabase = createClient()
 
     const hasActiveFilters = Boolean(filters.search || filters.status || filters.priority)
 
+    /**
+     * タスク一覧またはステータス数の変更を親コンポーネントに通知する
+     * @param {Task[]} list
+     * @returns {void}
+     */
     const notifyTasksChange = useCallback((list: Task[]) => {
       onTasksChange?.(list)
     }, [onTasksChange])
 
+    /**
+     * タスクステータス数の変更を親コンポーネントに通知する
+     * @param {Object} stats
+     * @returns {void}
+     */
     const notifyStatsChange = useCallback((stats?: { total: number; todo: number; in_progress: number; done: number }) => {
       if (!stats) return
       onStatsChange?.(stats)
     }, [onStatsChange])
 
+    /**
+     * タスク一覧をソートする
+     * @param {Task[]} list
+     * @param {SortItem} key
+     * @param {'asc' | 'desc'} order
+     * @returns {Task[]}
+     */
     const applySort = useCallback((list: Task[], key: SortItem, order: 'asc' | 'desc') => {
       return [...list].sort((a, b) => {
         let diff = 0
@@ -80,11 +96,15 @@ export function TaskList({
       })
     }, [])
 
-    const loadTasks = useCallback(async (pageToLoad: number, filtersToUse = filters) => {
+    /**
+     * タスク一覧をサーバーから取得する
+     * @param {Object} filtersToUse
+     * @returns {Promise<void>}
+     */
+    const loadTasks = useCallback(async (filtersToUse = filters) => {
       setLoading(true)
       try {
         const params = new URLSearchParams()
-        params.set('page', String(pageToLoad))
         if (filtersToUse.search) params.set('search', filtersToUse.search)
         if (filtersToUse.status) params.set('status', filtersToUse.status)
         if (filtersToUse.priority) params.set('priority', filtersToUse.priority)
@@ -92,82 +112,93 @@ export function TaskList({
         const res = await fetch(`/api/tasks?${params.toString()}`)
         const data = await res.json()
 
-        const availablePages = data?.pagination?.totalPages ?? 0
         notifyStatsChange(data?.statusCounts)
 
-        if (availablePages === 0) {
-          setTasks([])
-          notifyTasksChange([])
-          setPagination(data.pagination)
-          if (pageToLoad !== 1) onChangePage(1)
-          return
-        }
-
-        if (pageToLoad > availablePages) {
-          onChangePage(availablePages)
-          return
-        }
-
-        const sortedTasks = applySort(data.tasks, sortItem ,sortOrder)
+        const sortedTasks = applySort(data.tasks, sortItem, sortOrder)
         setTasks(sortedTasks)
         notifyTasksChange(sortedTasks)
-        setPagination(data.pagination)
       } finally {
         setLoading(false)
       }
     }, [applySort, filters, notifyTasksChange, sortItem, sortOrder])
 
+    // フィルタ変更時にタスクを再読み込み
     useEffect(() => {
-      loadTasks(page, filters)
-    }, [page, filters, loadTasks])
+      loadTasks(filters)
+    }, [filters, loadTasks])
 
-    useEffect(() => {
-      setTasks((prev) => applySort(prev, sortItem, sortOrder))
+    // ソート条件変更時にタスクを再ソート
+   useEffect(() => {
+    setTasks((prev) => applySort(prev, sortItem, sortOrder))
     }, [applySort, sortItem, sortOrder])
 
-  useEffect(() => {
-    const channel = supabase
-      .channel("tasks_changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "tasks" },
-        (payload) => {
-          console.log("リアルタイム更新:", payload)
+    // タスク一覧変更時に親コンポーネントに通知
+    useEffect(() => {
+      setActiveVerticalSlides({ todo: 0, in_progress: 0, done: 0 })
+    }, [tasks])
 
-          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE" || payload.eventType === "DELETE") {
-            loadTasks(page, filters)
+    // リアルタイム更新の設定
+    useEffect(() => {
+      const channel = supabase
+        .channel("tasks_changes")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "tasks" },
+          (payload) => {
+            console.log("リアルタイム更新:", payload)
+            if (payload.eventType === "INSERT" || payload.eventType === "UPDATE" || payload.eventType === "DELETE") {
+              loadTasks(filters)
+            }
           }
-        }
-      )
-      .subscribe()
+        )
+        .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [page, filters, loadTasks])
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }, [filters, loadTasks, supabase])
 
-  // タスク検索処理（サーバーフィルタリング）
+  /**
+   * タスク検索処理（サーバーフィルタリング）
+   * @param newFilters 
+   * @returns {void}
+   */
   const handleSearch = (newFilters: { search: string; status: string; priority: string }) => {
     setFilters(newFilters)
-    onChangePage(1)
   }
 
-  // タスクの日付でソートを切り替える処理
+  /**
+   * タスクの日付でソートを切り替える処理
+   * @param {}
+   * @returns {void}
+   */
   const handleChangeSort = () => {
     setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))
   }
 
+  /**
+   * ソートキー変更処理
+   * @param event
+   * @returns {void}
+   */
   const handleChangeSortKey = (event: ChangeEvent<HTMLSelectElement>) => {
     setSortItem(event.target.value as SortItem)
   }
 
-  // フィルタ解除処理
+  /**
+   * フィルタ解除処理
+   * @param {}
+   * @returns {void}
+   */
   const handleClear= () => {
     setFilters({ search: '', status: '', priority: '' })
-    onChangePage(1)
   }
 
-  // タスク作成処理
+  /**
+   * タスク作成処理
+   * @param data 
+   * @returns 
+   */
   const handleCreateTask = async (data: TaskFormData) => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -205,15 +236,18 @@ export function TaskList({
       })
 
       setShowForm(false)
-      onChangePage(1)
-      await loadTasks(1)
+      await loadTasks()
     } catch (error) {
       console.error('タスク作成エラー:', error)
       alert('タスクの作成に失敗しました')
     }
   }
 
-  // タスク更新処理
+  /**
+   * タスク更新処理
+   * @param data 
+   * @returns 
+   */
   const handleUpdateTask = async (data: TaskFormData) => {
     if (!editingTask) return
 
@@ -259,7 +293,7 @@ export function TaskList({
             : task
         )
       )
-      await loadTasks(page)
+      await loadTasks()
       setEditingTask(undefined)
     } catch (error) {
       console.error('タスク更新エラー:', error)
@@ -267,11 +301,14 @@ export function TaskList({
     }
   }
 
-  // タスク削除処理
+  /**
+   * タスク更新処理
+   * @param id 
+   */
   const handleDeleteTask = async (id: string) => {
     try {
       const { error } = await supabase.from('tasks').delete().eq('id', id)
-      await loadTasks(page)
+      await loadTasks()
 
       if (error) throw error
     } catch (error) {
@@ -280,13 +317,20 @@ export function TaskList({
     }
   }
 
-  // タスク編集のためのフォーム表示
+  /**  
+   * タスク編集処理
+   * @param task {Task}
+   * @return {void}
+  */
   const handleEditTask = (task: Task) => {
     setEditingTask(task)
     setShowForm(true)
   }
 
-  // タスク通知処理
+  /**
+   * タスク更新処理
+   * @param task 
+   */
   const handleAddGoogleCalendar = async (task: Task) => {
     const url = generateGoogleCalendarUrl({
       title: task.title,
@@ -300,24 +344,49 @@ export function TaskList({
     window.open(url, '_blank')
   }
 
-
-  // フォームを閉じる
+  /**
+   * タスクフォーム閉じる処理
+   * @param {}
+   * @returns {void}
+   */
   const handleCloseForm = () => {
     setShowForm(false)
     setEditingTask(undefined)
   }
-    return (
-      <>
+
+  const columns = [
+    { key: 'todo', label: '未対応', accent: 'bg-gray-50 border-gray-200' },
+    { key: 'in_progress', label: '対応中', accent: 'bg-blue-50 border-blue-200' },
+    { key: 'done', label: '完了', accent: 'bg-green-50 border-green-200' },
+  ] as const
+
+  /**
+   * 縦スクロール時のスライド切り替え処理
+   * @param columnKey 
+   * @returns {void}
+   */
+  const handleVerticalScroll = (columnKey: string) => {
+    const container = columnRefs.current[columnKey]
+    if (!container) return
+    const containerHeight = container.clientHeight
+    const nextIndex = Math.round(container.scrollTop / Math.max(containerHeight, 1))
+    setActiveVerticalSlides((prev) => ({ ...prev, [columnKey]: nextIndex }))
+  }
+  
+  return (
+    <>
       <div className="min-h-screen">
         {/* 検索バーと新規作成ボタン */}
         <div className="flex gap-4 items-center mt-8">
           <h1 className="text-xl font-bold text-green-800 h-9">検索・新規作成</h1>
           <p className="text-sm text-gray-500 pb-2">キーワード検索・条件検索</p>
         </div>
+
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="flex-1">
             <SearchBar onSearch={handleSearch} onClearFilter={handleClear} />
           </div>
+
           <button
             onClick={() => {
               setEditingTask(undefined);
@@ -330,17 +399,15 @@ export function TaskList({
           </button>
         </div>
 
+        {/* タスク一覧ヘッダー */}
         <div className="mt-8 mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-          <h1 className="text-xl font-bold text-green-800 h-9">
-            タスク一覧
-          </h1>
+          <h1 className="text-xl font-bold text-green-800 h-9">タスク一覧</h1>
+
           <div className="flex flex-wrap items-center gap-2">
-            <label
-              htmlFor="sortKey"
-              className="text-sm text-gray-500"
-            >
+            <label htmlFor="sortKey" className="text-sm text-gray-500">
               ソートキー:
             </label>
+
             <select
               id="sortKey"
               value={sortItem}
@@ -352,12 +419,13 @@ export function TaskList({
               <option value="due_date">期限日</option>
               <option value="created_at">作成日時</option>
             </select>
+
             <button
               onClick={handleChangeSort}
-              className="p-2 text-green-600 bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+              className="p-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
               title="ソート順を切り替え"
             >
-              {sortOrder === 'desc' ? (
+              {sortOrder === "desc" ? (
                 <LucideSortDesc className="h-6 w-6 text-gray-100" aria-label="降順でソート" />
               ) : (
                 <LucideSortAsc className="h-6 w-6 text-gray-100" aria-label="昇順でソート" />
@@ -365,12 +433,12 @@ export function TaskList({
             </button>
           </div>
 
-          {/* 説明テキスト */}
           <p className="text-sm text-gray-500 sm:ml-2">
             タスクの編集・削除・ソート・Google Calendarの予定追加はこちらで行います
           </p>
         </div>
 
+        {/* タスク一覧 */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-green-600" />
@@ -378,19 +446,16 @@ export function TaskList({
         ) : tasks.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-gray-400 text-lg mb-2">
-              {hasActiveFilters ? '検索結果がありません' : 'タスクがありません'}
+              {hasActiveFilters ? "検索結果がありません" : "タスクがありません"}
             </div>
             <p className="text-gray-500 text-sm">
-              {hasActiveFilters && '新しいタスクを作成してみましょう'}
+              {hasActiveFilters && "新しいタスクを作成してみましょう"}
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[{ key: 'todo', label: '未対応', accent: 'bg-gray-50 border-gray-200' },
-              { key: 'in_progress', label: '対応中', accent: 'bg-blue-50 border-blue-200' },
-              { key: 'done', label: '完了', accent: 'bg-green-50 border-green-200' },
-            ].map((column) => {
-              const columnTasks = tasks.filter((task) => task.status === column.key)
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {columns.map((column) => {
+              const columnTasks = tasks.filter((task) => task.status === column.key);
 
               return (
                 <div
@@ -402,33 +467,29 @@ export function TaskList({
                     <span className="text-xs text-gray-500">{columnTasks.length}件</span>
                   </div>
 
-                  {columnTasks.length === 0 ? (
-                    <p className="text-sm text-gray-400 py-6 text-center">タスクなし</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {columnTasks.map((task) => (
+                  {/* タスクカード群 */}
+                  <div
+                    ref={(el) => {
+                      columnRefs.current[column.key] = el
+                    }}
+                    onScroll={() => handleVerticalScroll(column.key)}
+                    className="flex flex-col gap-3 overflow-y-auto max-h-[500px] pr-2"
+                  >
+                    {columnTasks.map((task) => (
+                      <div key={task.id}>
                         <TaskCard
-                          key={task.id}
                           task={task}
                           onEdit={handleEditTask}
                           onDelete={handleDeleteTask}
                           onNotify={handleAddGoogleCalendar}
                         />
-                      ))}
-                    </div>
-                  )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              )
+              );
             })}
           </div>
-        )}
-
-        {pagination && (
-          <Pagination
-            page={page ?? 1}
-            totalPages={pagination.totalPages}
-            onChange={onChangePage}
-            />
         )}
 
         {/* タスクフォームモーダル */}
@@ -439,8 +500,8 @@ export function TaskList({
             onClose={handleCloseForm}
           />
         )}
-        </div>
-        </>
-    )
+      </div>
+    </>
+  );
 }
 

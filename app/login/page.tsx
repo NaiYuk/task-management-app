@@ -15,6 +15,11 @@ export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  /** 
+   * 認証処理（ログイン・サインアップ）
+   * @param e {React.FormEvent}
+   * @return {Promise<void>}
+   */
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)

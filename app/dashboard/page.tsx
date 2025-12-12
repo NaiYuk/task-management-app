@@ -9,19 +9,22 @@ import { TaskList } from '@/components/TaskList'
 
 export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([])
-  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [userEmail, setUserEmail] = useState<string>('')
   const [taskStats, setTaskStats] = useState({ total: 0, todo: 0, in_progress: 0, done: 0 })
   const router = useRouter()
   const supabase = createClient()
 
+  // 初回ロード時にユーザー情報とタスクを取得
   useEffect(() => {
     loadUser()
     loadTasks()
   }, [])
   
-  // ユーザー情報の読み込み 
+  /**
+   * ユーザー情報の読み込み
+   * @return {Promise<void>}
+   */
   const loadUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
@@ -31,6 +34,10 @@ export default function DashboardPage() {
     }
   }
 
+  /** 
+   * タスク一覧の読み込み
+   * @return {Promise<void>}
+   */
   const loadTasks = async () => {
     setLoading(true)
     try {
@@ -56,7 +63,10 @@ export default function DashboardPage() {
     }
   }
 
-  // ログアウト処理
+  /**
+   * ログアウト処理
+   * @return {Promise<void>}
+   */
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -72,7 +82,7 @@ export default function DashboardPage() {
             {/* 左側ロゴ */}
             <div className="flex items-center gap-3">
               <LucidePackage className="h-8 w-8 text-green-900 inline-block mb-1" />
-              <p className="text-2xl font-bold text-green-900">タスク管理アプリ　たすくん。</p>
+              <p className="text-2xl font-bold text-green-900">タスク管理アプリ たすくん。</p>
             </div>
 
             {/* 右側 ユーザー情報 */}
@@ -126,11 +136,9 @@ export default function DashboardPage() {
           </div>
         </div>
         <TaskList 
-          page={page}
           userEmail={userEmail}
           onTasksChange={setTasks}
           onStatsChange={setTaskStats}
-          onChangePage={(newPage: number) => setPage(newPage)}
         />
       </main>
     </div>
