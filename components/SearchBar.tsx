@@ -15,7 +15,7 @@ type SpeechRecognitionInstance = {
   stop: () => void
 }
 
-type DueFilter = 'overdue' | 'due_soon'
+export type DueFilter = 'overdue' | 'due_soon'
 
 interface SearchBarProps {
   onSearch: (filters: { search: string; statuses: TaskStatus[]; dueFilters: DueFilter[] }) => void

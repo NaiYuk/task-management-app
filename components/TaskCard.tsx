@@ -64,14 +64,14 @@ function getDueDateStyles(dueDate?: string | null) {
   if (parsedDueDate < startOfToday) {
     return {
       text: 'text-red-700',
-      pill: 'bg-red-50 text-red-700 border border-red-100',
+      pill: 'bg-red-50 text-red-700 font-bold border border-red-100',
     }
   }
 
   if (daysUntilDue < 5) {
     return {
       text: 'text-amber-700',
-      pill: 'bg-amber-50 text-amber-700 border border-amber-100',
+      pill: 'bg-amber-50 text-amber-700 font-bold border border-amber-100',
     }
   }
 

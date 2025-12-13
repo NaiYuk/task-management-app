@@ -8,6 +8,7 @@ import { Loader2, LucideSortAsc, LucideSortDesc, Plus } from "lucide-react";
 import SearchBar from "./SearchBar";
 import TaskForm from "./TaskForm";
 import TaskCard from "./TaskCard";
+import type { DueFilter } from "@/components/SearchBar";
 
 type SortItem = 'title' | 'priority' | 'due_date' | 'created_at'
 type ColumnSortState = Record<TaskStatus, { key: SortItem; order: 'asc' | 'desc' }>;
@@ -27,7 +28,7 @@ export function TaskList({
     const [loading, setLoading] = useState(false)
     const [sortItem, setSortItem] = useState<SortItem>('created_at')
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-    const [filters, setFilters] = useState<{ search: string; statuses: TaskStatus[] }>({ search: '', statuses: [] })
+    const [filters, setFilters] = useState<{ search: string; statuses: TaskStatus[]; dueFilters: DueFilter[] }>({ search: '', statuses: [], dueFilters: [] })
     const currentFiltersRef = useRef(filters)
     const [columnSorts, setColumnSorts] = useState<ColumnSortState>({
       todo: { key: 'created_at', order: 'desc' },
@@ -123,6 +124,7 @@ export function TaskList({
         const filtersToUse = currentFiltersRef.current
         if (filtersToUse.search) params.set('search', filtersToUse.search)
         if (filtersToUse.statuses.length) params.set('statuses', filtersToUse.statuses.join(','))
+        if (filtersToUse.dueFilters.length) params.set('dueFilters', filtersToUse.dueFilters.join(','))
 
         const res = await fetch(`/api/tasks?${params.toString()}`)
         const data = await res.json()
@@ -177,13 +179,17 @@ export function TaskList({
       }
     }, [loadTasks, supabase])
 
+    useEffect(() => {
+      console.log("filters:", filters)
+    }, [filters])
+
   /**
    * タスク検索処理（サーバーフィルタリング）
    * @param newFilters 
    * @returns {void}
    */
-  const handleSearch = (newFilters: { search: string; statuses: TaskStatus[] }) => {
-    setFilters(newFilters)
+  const handleSearch = (newFilters: { search: string; statuses: TaskStatus[]; dueFilters: DueFilter[] }) => {
+    setFilters(prev => ({ ...prev, ...newFilters }))
   }
 
   /**
@@ -210,7 +216,7 @@ export function TaskList({
    * @returns {void}
    */
   const handleClear= () => {
-    setFilters({ search: '', statuses: [] })
+    setFilters({ search: '', statuses: [], dueFilters: [] })
   }
 
   /**
