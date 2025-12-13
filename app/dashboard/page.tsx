@@ -194,6 +194,15 @@ export default function DashboardPage() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-900"
               />
               <p className="text-xs text-gray-500">未入力の場合は環境変数のWebhook URLが利用されます。</p>
+              <p className="text-xs text-gray-500">Slack通知の設定方法は
+                <a
+                  href="/slack-help"
+                  target='_blank'
+                  className="text-blue-600 underline hover:text-blue-800 ml-1"
+                >
+                  こちら
+                </a>
+              からご確認いただけます。</p>
             </div>
 
             <div className="flex justify-end gap-3">
