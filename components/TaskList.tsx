@@ -16,10 +16,12 @@ export function TaskList({
   userEmail,
   onStatsChange,
   onTasksChange,
+  slackWebhookUrl,
 }: {
   userEmail: string
   onTasksChange?: (tasks: Task[]) => void
   onStatsChange?: (stats: { total: number; todo: number; in_progress: number; done: number }) => void
+  slackWebhookUrl?: string
 }) {
     const [tasks, setTasks] = useState<Task[]>([])
     const [fetchedTasks, setFetchedTasks] = useState<Task[]>([])
@@ -42,6 +44,7 @@ export function TaskList({
       done: 0,
     })
     const activeRequest = useRef<AbortController | null>(null)
+    const reminderTimers = useRef<ReturnType<typeof setTimeout>[]>([])
     const supabase = createClient()
 
     const hasActiveFilters = Boolean(filters.search || filters.statuses.length)
@@ -179,10 +182,13 @@ export function TaskList({
       }
     }, [loadTasks, supabase])
 
+    // コンポーネントアンマウント時にリマインダータイマーをクリア
     useEffect(() => {
-      console.log("filters:", filters)
-    }, [filters])
-
+      return () => {
+        reminderTimers.current.forEach((timer) => clearTimeout(timer))
+        reminderTimers.current = []
+      }
+    }, [])
   /**
    * タスク検索処理（サーバーフィルタリング）
    * @param newFilters 
@@ -197,18 +203,6 @@ export function TaskList({
    * @param {}
    * @returns {void}
    */
-  const handleChangeSort = () => {
-    setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))
-  }
-
-  /**
-   * ソートキー変更処理
-   * @param event
-   * @returns {void}
-   */
-  const handleChangeSortKey = (event: ChangeEvent<HTMLSelectElement>) => {
-    setSortItem(event.target.value as SortItem)
-  }
 
   /**
    * フィルタ解除処理
@@ -217,6 +211,67 @@ export function TaskList({
    */
   const handleClear= () => {
     setFilters({ search: '', statuses: [], dueFilters: [] })
+  }
+
+  const calculateReminderTime = (data: TaskFormData, taskDueDate?: string | null) => {
+    const baseDateString = taskDueDate || data.due_date
+    const baseDate = baseDateString ? new Date(baseDateString) : new Date()
+
+    if (Number.isNaN(baseDate.getTime())) return null
+
+    switch (data.reminderTiming) {
+      case '10m':
+        return new Date(baseDate.getTime() - 10 * 60 * 1000)
+      case '1h':
+        return new Date(baseDate.getTime() - 60 * 60 * 1000)
+      case 'custom':
+        if (!data.reminderCustomTime) return null
+        const customDate = new Date(data.reminderCustomTime)
+        return Number.isNaN(customDate.getTime()) ? null : customDate
+      case 'start':
+      default:
+        return baseDate
+    }
+  }
+
+  const scheduleReminder = (task: Task, data: TaskFormData) => {
+    if (!data.reminderEnabled || !data.slackWebhookUrl) return
+
+    const reminderAt = calculateReminderTime(data, task.due_date)
+    if (!reminderAt) return
+
+    const delay = reminderAt.getTime() - Date.now()
+    const triggerReminder = async () => {
+      try {
+        await fetch('/api/slack/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'reminder',
+            reminder_time: reminderAt.toISOString(),
+            task: {
+              title: task.title,
+              description: task.description,
+              status: task.status,
+              priority: task.priority,
+              due_date: task.due_date,
+            },
+            user_email: userEmail,
+            webhookUrl: data.slackWebhookUrl,
+          }),
+        })
+      } catch (error) {
+        console.error('Slackリマインド送信エラー:', error)
+      }
+    }
+
+    if (delay <= 0) {
+      triggerReminder()
+      return
+    }
+
+    const timer = setTimeout(triggerReminder, delay)
+    reminderTimers.current.push(timer)
   }
 
   /**
@@ -296,8 +351,11 @@ export function TaskList({
             priority: task.priority,
           },
           user_email: userEmail,
+          webhookUrl: slackWebhookUrl,
         }),
       })
+
+      scheduleReminder(task as Task, data)
 
       setShowForm(false)
       await loadTasks()
@@ -347,9 +405,16 @@ export function TaskList({
               priority: data.priority,
             },
             user_email: userEmail,
+            webhookUrl: slackWebhookUrl
           }),
         })
       }
+      const updatedTaskFprReminder: Task = {
+        ...editingTask,
+        ...data,
+        due_date: data.due_date === "" ? null : data.due_date || editingTask.due_date,
+      }
+      scheduleReminder(updatedTaskFprReminder, data)
       setTasks((prev) =>
         prev.map((task) =>
           task.id === editingTask.id
@@ -557,6 +622,7 @@ export function TaskList({
             task={editingTask}
             onSubmit={editingTask ? handleUpdateTask : handleCreateTask}
             onClose={handleCloseForm}
+            defaultSlackWebhookUrl={slackWebhookUrl}
           />
         )}
       </div>
