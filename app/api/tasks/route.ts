@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { TaskStatus } from '@/types/task'
+import { Task, TaskStatus } from '@/types/task'
+import { applyDueDateFilters } from "@/lib/date/date-filter";
 
 /**
  * タスク作成処理
@@ -66,8 +67,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * タスク一覧取得（検索・フィルタリング対応）
+
+/** * タスク一覧取得処理
  * @param request 
  * @returns 
  */
@@ -80,31 +81,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '認証が必要です' }, { status: 401 })
     }
 
+    // パラメータ取得
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get('search') || ''
     const statusesParam = searchParams.get('statuses') || ''
+    const dueFilterParam = searchParams.get('dueFilters') || ''
+
     const statuses = statusesParam
       .split(',')
-      .map((value) => value.trim())
-      .filter((value): value is TaskStatus => value === 'todo' || value === 'in_progress' || value === 'done')
+      .map(v => v.trim())
+      .filter((v): v is TaskStatus => ['todo', 'in_progress', 'done'].includes(v))
 
-    /**
-     * フィルタリング付きクエリ作成ヘルパー
-     * @param statusOverride 
-     * @param countOnly 
-     * @returns 
-     */
-    const createFilteredQuery = (statusOverride?: string, countOnly = false) => {
+    const dueFilters = dueFilterParam
+      .split(',')
+      .map(v => v.trim())
+      .filter(v => ['overdue', 'due_soon'].includes(v))
+
+    // クエリ作成関数
+    const createFilteredQuery = (statusOverride?: TaskStatus, countOnly = false) => {
       let query = supabase
         .from('tasks')
         .select('*', { count: 'exact', head: countOnly })
         .eq('user_id', user.id)
 
-      // LIKE検索（タイトルまたは説明）
+      // LIKE検索
       if (search) {
         query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`)
       }
 
+      // ステータス検索
       if (statusOverride) {
         query = query.eq('status', statusOverride)
       } else if (statuses.length) {
@@ -114,31 +119,30 @@ export async function GET(request: NextRequest) {
       return query
     }
 
-    /**
-     * タスクステータス別集計クエリ作成ヘルパー
-     * @param statusOverride 
-     * @returns 
-     */
+    // ステータス集計クエリ
     const createStatsQuery = (statusOverride?: TaskStatus) => {
       let query = supabase
         .from('tasks')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
 
-      if (statusOverride) {
-        query = query.eq('status', statusOverride)
-      }
+      if (statusOverride) query = query.eq('status', statusOverride)
 
       return query
     }
 
-    const { data: tasks, error } = await createFilteredQuery()
+    // 実データ取得
+    const { data: rawTasks, error } = await createFilteredQuery()
       .order('created_at', { ascending: false })
-    
+
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
+    // 期限日フィルタリング
+    const tasks = applyDueDateFilters(rawTasks, dueFilters)
+
+    //  ステータス別カウント
     const [totalResult, todoResult, inProgressResult, doneResult] = await Promise.all([
       createStatsQuery(),
       createStatsQuery('todo'),
@@ -146,8 +150,9 @@ export async function GET(request: NextRequest) {
       createStatsQuery('done'),
     ])
 
-    const total = totalResult.count || 0
-    const countError = totalResult.error || todoResult.error || inProgressResult.error || doneResult.error
+    const countError =
+      totalResult.error || todoResult.error || inProgressResult.error || doneResult.error
+
     if (countError) {
       return NextResponse.json({ error: countError.message }, { status: 400 })
     }
@@ -155,12 +160,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       tasks,
       statusCounts: {
-        total,
+        total: totalResult.count ?? 0,
         todo: todoResult.count ?? 0,
         in_progress: inProgressResult.count ?? 0,
         done: doneResult.count ?? 0,
       },
     }, { status: 200 })
+
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
