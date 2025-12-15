@@ -59,7 +59,7 @@ function getDueDateStyles(dueDate?: string | null) {
   const startOfToday = new Date()
   startOfToday.setHours(0, 0, 0, 0)
   const parsedDueDate = new Date(dueDate)
-  const daysUntilDue = Math.floor((parsedDueDate.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24))
+  const daysUntilDue = Math.floor((parsedDueDate.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24)) // ミリ秒から日に変換
 
   if (parsedDueDate < startOfToday) {
     return {
@@ -67,7 +67,8 @@ function getDueDateStyles(dueDate?: string | null) {
       pill: 'bg-red-50 text-red-700 font-bold border border-red-100',
     }
   }
-
+  
+  // 期限が5日以内
   if (daysUntilDue < 5) {
     return {
       text: 'text-amber-700',
