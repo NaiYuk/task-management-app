@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Task } from '@/types/task'
-import {LogOut, LucideActivity, LucideLoader, LucideCheck, LucidePackage, LucidePauseCircle, LucideSettings, X } from 'lucide-react'
+import {LogOut, LucidePackage, LucideSettings, X} from 'lucide-react'
 import { TaskList } from '@/components/TaskList'
+import TaskAnalysis from '@/components/TaskAnalysis'
 
 export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -129,37 +130,7 @@ export default function DashboardPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 統計カード */}
-        <h1 className="text-xl font-bold text-green-800 h-9">タスク統計情報</h1>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-yellow-100 bg-opacity-50 rounded-xl shadow-sm p-5 border border-gray-200">
-            <div className="text-sm text-gray-600 mb-1">
-              <LucideActivity className='h-5 w-5 mb-2 text-yellow-600'/>
-              全体
-            </div>
-            <div className="text-3xl font-bold text-gray-900">{taskStats.total}</div>
-          </div>
-          <div className="bg-gray-100 bg-opacity-50 rounded-xl shadow-sm p-5 border border-gray-200">
-            <div className="text-sm text-gray-600 mb-1">
-              <LucidePauseCircle className='h-5 w-5 mb-2 text-gray-600'/>
-              未対応
-            </div>
-            <div className="text-3xl font-bold text-gray-600">{taskStats.todo}</div>
-          </div>
-          <div className="bg-indigo-100 bg-opacity-50 rounded-xl shadow-sm p-5 border border-blue-200">
-            <div className="text-sm text-gray-600 mb-1">
-              <LucideLoader className='h-5 w-5 mb-2 text-indigo-600'/>
-              対応中
-            </div>
-            <div className="text-3xl font-bold text-gray-600">{taskStats.in_progress}</div>
-          </div>
-          <div className="bg-green-200 bg-opacity-70 rounded-xl shadow-sm p-5 border border-green-300">
-            <div className="text-sm text-gray-600 mb-1">
-              <LucideCheck className='h-5 w-5 mb-2 text-green-600'/>
-              完了
-            </div>
-            <div className="text-3xl font-bold text-gray-600">{taskStats.done}</div>
-          </div>
-        </div>
+        <TaskAnalysis taskStats={taskStats} tasks={tasks} />
         <TaskList 
           userEmail={userEmail}
           onTasksChange={setTasks}
