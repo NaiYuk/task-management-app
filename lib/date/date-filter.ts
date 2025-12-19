@@ -3,17 +3,17 @@ import { Task } from "@/types/task";
 /**
  * 日付を正規化（時分秒を0に設定）
  * @param date 
- * @returns 
+ * @returns 正規化された日付
  */
 export function normalizeDate(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 /**
- * 期限日フィルタリングを適用
+ * 期限日フィルタリングを適用 (true: 該当, false: 非該当)
  * @param tasks
  * @param dueFilters
- * @returns 
+ * @returns フィルタリング結果のboolean配列
  */
 export function applyDueDateFilters(tasks: Task[], dueFilters: string[]) {
   if (dueFilters.length === 0) return tasks;
